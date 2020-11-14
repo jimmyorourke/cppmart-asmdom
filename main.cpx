@@ -126,8 +126,8 @@ public:
     Home() {
         // TODO: load from file in background thread
         _state = {std::vector<Product>{
-            {1, "Apple",  "An apple a day keeps the doctor away","/products/apple.png", 3.65 },
-            {2, "Banana",  "An old banana leaf was once young and green","/products/banana.png", 7.99 },
+            {1, "Apple",  "An apple a day keeps the doctor away","./products/apple.png", 3.65 },
+            {2, "Banana",  "An old banana leaf was once young and green","./products/banana.png", 7.99 },
             }, {}, true, false}; 
         navbar.bindCartValue(&_cartValue);
     }

@@ -1,0 +1,3 @@
+[submodule "cmake-asm-dom-wrapper"]
+	path = cmake-asm-dom-wrapper
+	url = https://github.com/jimmyorourke/cmake-asm-dom-wrapper.git

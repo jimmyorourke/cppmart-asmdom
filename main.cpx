@@ -8,6 +8,7 @@
 #include <emscripten.h>
 #include <emscripten/bind.h>
 
+// Format to a number of decimal places -- fmtlib would also work well
 template <typename T>
 std::string to_fixed_precision_str(T num, int decimalPlaces = 2) {
     static_assert(std::is_arithmetic<T>::value, "Integral required.");
@@ -88,58 +89,49 @@ std::unique_ptr<ProductDetail> productPage;
 // This gets created and immediately destroyed each render. Should just be function?
 class ProductCard {
  public:
-    struct Props {
-        Product product;
-        asmdom::Callback onAddToCart;
-    };
-    ProductCard(Props props)
-    : _props{std::move(props)} {}
+    ProductCard(Product product, asmdom::Callback onAddToCart)
+    : _product{std::move(product)}
+    , _onAddToCart{std::move(onAddToCart)} {}
 
     asmdom::VNode* render() {
         // clang-format off
         return <div class = "product_card_container">
-                 <div(onclick) = {[p = this->_props](emscripten::val) -> bool {
+                 <div(onclick) = {[p = this->_product, c = this->_onAddToCart](emscripten::val) -> bool {
                     std::cout << "product deatail\n";
-                    productPage = std::make_unique<ProductDetail>(p.product, p.onAddToCart);
+                    productPage = std::make_unique<ProductDetail>(p, c);
                     ::render(productPage->render());
                     return true;
                  }}>
-                   <img class = "product_card_image" src = {_props.product.image} />
-                   <div class = "product_card_name">{_props.product.name}</ div>
+                   <img class = "product_card_image" src = {_product.image} />
+                   <div class = "product_card_name">{_product.name}</ div>
                  </ div>
-                 <div class = "product_card_price">{"$" + to_fixed_precision_str(_props.product.price)}</ div>
-                 <button class = "product_atc_button"(onclick) = {_props.onAddToCart}> Add To Cart</ button>
+                 <div class = "product_card_price">{"$" + to_fixed_precision_str(_product.price)}</ div>
+                 <button class = "product_atc_button"(onclick) = {_onAddToCart}> Add To Cart</ button>
                </ div>;
         // clang-format on
     }
 
  private:
-    Props _props{};
+    Product _product;
+    asmdom::Callback _onAddToCart;
 };
 
 class Home {
  public:
     Home() {
         // TODO: load from file in background thread
-        _state = {std::vector<Product>{
-                      {1, "Apple", "An apple a day keeps the doctor away", "./products/apple.png", 3.65},
-                      {2, "Banana", "An old banana leaf was once young and green", "./products/banana.png", 7.99},
-                  },
-                  {},
-                  true,
-                  false};
+        _products = {
+            {1, "Apple", "An apple a day keeps the doctor away", "./products/apple.png", 3.65},
+            {2, "Banana", "An old banana leaf was once young and green", "./products/banana.png", 7.99},
+        };
         navbar.bindCartValue(&_cartValue);
     }
 
     asmdom::VNode* render() {
         EM_ASM(history.replaceState(null, null, "./"));
-        if (!_state.productsLoaded) {
-            return <div>{"Loading ..."}</ div>;
-        } else if (_state.productsError) {
-            return <div>{"Error loading products :("}</ div>;
-        }
+       
         asmdom::Children productViews;
-        for (const auto& product : _state.products) {
+        for (const auto& product : _products) {
             // IMPORTANT! Pass by copy to callback!!!!
             productViews.push_back(
                 ProductCard({product, [this, product](emscripten::val) -> bool { return this->addToCart(product); }})
@@ -147,26 +139,25 @@ class Home {
         }
         _cartValue = 0.f;
         auto cartprods = 0;
-        for (const auto& cartProduct : _state.cartProducts) {
+        for (const auto& cartProduct : _cartProducts) {
             _cartValue += cartProduct.quantity * cartProduct.product.price;
             std::cout << "cart prods: " << ++cartprods << "\n";
         }
         std::cout << "cartvalue " << _cartValue << "\n";
-        // TODO: format to 2 decimal places -- fmtlib would work well with asm-dom/gccx
         return <div>{navbar.render()}<div class = "product_card_list">{... productViews}</ div></ div>;
     }
 
  private:
     bool addToCart(const Product& product) {
-        auto pit = std::find_if(_state.products.begin(), _state.products.end(),
+        auto pit = std::find_if(_products.begin(), _products.end(),
                                 [product](const auto& p) { return p.id == product.id; });
-        auto cpit = std::find_if(_state.cartProducts.begin(), _state.cartProducts.end(),
+        auto cpit = std::find_if(_cartProducts.begin(), _cartProducts.end(),
                                  [product](const auto& p) { return p.product.id == product.id; });
-        if (cpit != _state.cartProducts.end()) {
+        if (cpit != _cartProducts.end()) {
             cpit->quantity += 1;
         } else {
-            // structs emplace_back?
-            _state.cartProducts.push_back({*pit, 1});
+            // structs emplace_back doesn't work?
+            _cartProducts.push_back({*pit, 1});
         }
         std::cout << "called add to cart with " << product.id << ", " << product.name << ", " << product.description
                   << "," << product.image << ", " << product.price << "\n";
@@ -178,13 +169,8 @@ class Home {
         Product product;
         int quantity;
     };
-    struct State {
-        std::vector<Product> products;
-        std::vector<CartProduct> cartProducts;
-        bool productsLoaded{false};
-        bool productsError{false};
-    };
-    State _state{};
+    std::vector<Product> _products;
+    std::vector<CartProduct> _cartProducts;
     double _cartValue{};
 };
 

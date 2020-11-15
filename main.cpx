@@ -129,7 +129,7 @@ class Home {
 
     asmdom::VNode* render() {
         EM_ASM(history.replaceState(null, null, "./"));
-       
+
         asmdom::Children productViews;
         for (const auto& product : _products) {
             // IMPORTANT! Pass by copy to callback!!!!
@@ -149,8 +149,8 @@ class Home {
 
  private:
     bool addToCart(const Product& product) {
-        auto pit = std::find_if(_products.begin(), _products.end(),
-                                [product](const auto& p) { return p.id == product.id; });
+        auto pit =
+            std::find_if(_products.begin(), _products.end(), [product](const auto& p) { return p.id == product.id; });
         auto cpit = std::find_if(_cartProducts.begin(), _cartProducts.end(),
                                  [product](const auto& p) { return p.product.id == product.id; });
         if (cpit != _cartProducts.end()) {

@@ -3,196 +3,61 @@
 #include <iomanip>
 #include <iostream>
 #include <sstream>
-#include <type_traits>
 
 #include <emscripten.h>
 #include <emscripten/bind.h>
+#include "Home.hpp"
+#include "ProductDetail.hpp"
 
-// Format to a number of decimal places -- fmtlib would also work well
-template <typename T>
-std::string to_fixed_precision_str(T num, int decimalPlaces = 2) {
-    static_assert(std::is_arithmetic<T>::value, "Integral required.");
-    std::stringstream stream;
-    stream << std::fixed << std::setprecision(2) << num;
-    return stream.str();
-}
-
-asmdom::VNode* currentVnode = nullptr;
-
-void render(asmdom::VNode* newVnode) {
-    static auto vdomReplaced = false;
-    if (!vdomReplaced) {
-        const auto root =
-            emscripten::val::global("document").call<emscripten::val>("getElementById", std::string("root"));
-        currentVnode = asmdom::patch(root, newVnode);
-        vdomReplaced = true;
-    } else {
-        currentVnode = asmdom::patch(currentVnode, newVnode);
-    }
-}
-
-class Navbar {
+class App {
  public:
-    void bindCartValue(double* valuePtr) { _cartValue = valuePtr; }
-
-    asmdom::VNode* render() {
-        // clang-format off
-        return <div class = "navbar">
-                 <div class = "navbar_title">{"CppMart"}</ div>
-               <div class = "navbar_cart_value">{to_fixed_precision_str(*_cartValue)}</ div></ div>;
-        // clang-format on
+    void run() {
+        // inital view
+        homePage = std::make_unique<Home>(&cartValue, this);
+        pageRender(homePage->render());
     }
-
- private:
-    double* _cartValue{};
-};
-
-struct Product {
-    int id;
-    std::string name;
-    std::string description;
-    std::string image;
-    double price;
-};
-
-Navbar navbar{};
-
-class ProductDetail {
- public:
-    ProductDetail(Product product, asmdom::Callback onAddToCart)
-    : _product{product}
-    , _onAddToCart{onAddToCart} {}
-
-    asmdom::VNode* render() {
-        EM_ASM(history.pushState(null, null, "productpage.php"));
-
-        // clang-format off
-        return <div>{navbar.render()}
-                 <div class = "product_detail_container">
-                   <img class = "product_detail_image" src = {_product.image} />
-                   <div class = "product_card_name">{_product.name}</ div>
-                   <div style = "margin: 10px 0; line-height: 24px;">{_product.description}</ div>
-                   <div class = "product_card_price">{"$" + to_fixed_precision_str(_product.price)}</ div>
-                   <button class = "product_atc_button"(onclick) = {_onAddToCart}> Add To Cart</ button>
-                 </ div>
-               </ div>;
-        // clang-format on
-    }
-
- private:
-    Product _product;
-    asmdom::Callback _onAddToCart;
-};
-
-std::unique_ptr<ProductDetail> productPage;
-
-// This gets created and immediately destroyed each render. Should just be function?
-class ProductCard {
- public:
-    ProductCard(Product product, asmdom::Callback onAddToCart)
-    : _product{std::move(product)}
-    , _onAddToCart{std::move(onAddToCart)} {}
-
-    asmdom::VNode* render() {
-        // clang-format off
-        return <div class = "product_card_container">
-                 <div(onclick) = {[p = this->_product, c = this->_onAddToCart](emscripten::val) -> bool {
-                    std::cout << "product deatail\n";
-                    productPage = std::make_unique<ProductDetail>(p, c);
-                    ::render(productPage->render());
-                    return true;
-                 }}>
-                   <img class = "product_card_image" src = {_product.image} />
-                   <div class = "product_card_name">{_product.name}</ div>
-                 </ div>
-                 <div class = "product_card_price">{"$" + to_fixed_precision_str(_product.price)}</ div>
-                 <button class = "product_atc_button"(onclick) = {_onAddToCart}> Add To Cart</ button>
-               </ div>;
-        // clang-format on
-    }
-
- private:
-    Product _product;
-    asmdom::Callback _onAddToCart;
-};
-
-class Home {
- public:
-    Home() {
-        // TODO: load from file in background thread
-        _products = {
-            {1, "Apple", "An apple a day keeps the doctor away", "./products/apple.png", 3.65},
-            {2, "Banana", "An old banana leaf was once young and green", "./products/banana.png", 7.99},
-        };
-        navbar.bindCartValue(&_cartValue);
-    }
-
-    asmdom::VNode* render() {
-        EM_ASM(history.replaceState(null, null, "./"));
-
-        asmdom::Children productViews;
-        for (const auto& product : _products) {
-            // IMPORTANT! Pass by copy to callback!!!!
-            productViews.push_back(
-                ProductCard({product, [this, product](emscripten::val) -> bool { return this->addToCart(product); }})
-                    .render());
-        }
-        _cartValue = 0.f;
-        auto cartprods = 0;
-        for (const auto& cartProduct : _cartProducts) {
-            _cartValue += cartProduct.quantity * cartProduct.product.price;
-            std::cout << "cart prods: " << ++cartprods << "\n";
-        }
-        std::cout << "cartvalue " << _cartValue << "\n";
-        return <div>{navbar.render()}<div class = "product_card_list">{... productViews}</ div></ div>;
-    }
-
- private:
-    bool addToCart(const Product& product) {
-        auto pit =
-            std::find_if(_products.begin(), _products.end(), [product](const auto& p) { return p.id == product.id; });
-        auto cpit = std::find_if(_cartProducts.begin(), _cartProducts.end(),
-                                 [product](const auto& p) { return p.product.id == product.id; });
-        if (cpit != _cartProducts.end()) {
-            cpit->quantity += 1;
+    void pageRender(asmdom::VNode* newVnode) {
+        static auto vdomReplaced = false;
+        if (!vdomReplaced) {
+            const auto root =
+                emscripten::val::global("document").call<emscripten::val>("getElementById", std::string("root"));
+            _currentVnode = asmdom::patch(root, newVnode);
+            vdomReplaced = true;
         } else {
-            // structs emplace_back doesn't work?
-            _cartProducts.push_back({*pit, 1});
+            _currentVnode = asmdom::patch(_currentVnode, newVnode);
         }
-        std::cout << "called add to cart with " << product.id << ", " << product.name << ", " << product.description
-                  << "," << product.image << ", " << product.price << "\n";
-        ::render(render());
-        return true;
     }
 
-    struct CartProduct {
-        Product product;
-        int quantity;
-    };
-    std::vector<Product> _products;
-    std::vector<CartProduct> _cartProducts;
-    double _cartValue{};
+    void renderHome() {
+        pageRender(homePage->render());
+    }
+    // application state -- shared state needed by multiple page views
+    double cartValue{};
+
+    // views - lazy init
+    std::unique_ptr<Home> homePage;
+    std::unique_ptr<ProductDetail> productPage;
+    
+private:
+    asmdom::VNode* _currentVnode = nullptr;
 };
 
-asmdom::VNode* current_view = nullptr;
+// void renderHome() { render(home.render()); }
 
-Home home{};
+// void renderProduct() { render(productPage->render()); }
 
-void renderHome() { render(home.render()); }
-
-void renderProduct() { render(productPage->render()); }
-
-EMSCRIPTEN_BINDINGS(app) {
-    emscripten::function("renderHome", &renderHome);
-    emscripten::function("renderProduct", &renderProduct);
-};
+// EMSCRIPTEN_BINDINGS(app) {
+//     emscripten::function("renderHome", &renderHome);
+//     emscripten::function("renderProduct", &renderProduct);
+// };
 
 int main() {
     // Initialize asm-dom.
     const auto config = asmdom::Config();
     asmdom::init(config);
 
-    render(home.render());
+    static App app;
+    app.run();
 
     EM_ASM(window.addEventListener(
         'popstate', function(e) {

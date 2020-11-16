@@ -1,0 +1,25 @@
+#include "ProductDetail.hpp"
+
+#include <emscripten.h>
+#include "Navbar.hpp"
+#include "utils.hpp"
+
+asmdom::VNode* ProductDetail::render() {
+    EM_ASM(history.pushState(null, null, "productpage.php"));
+
+    // clang-format off
+    return <div>{Navbar(_cartValue).render()}
+                <div class = "product_detail_container">
+                <img class = "product_detail_image" src = {_product.image} />
+                <div class = "product_card_name">{_product.name}</ div>
+                <div style = "margin: 10px 0; line-height: 24px;">{_product.description}</ div>
+                <div class = "product_card_price">{"$" + to_fixed_precision_str(_product.price)}</ div>
+                <button class = "product_atc_button"(onclick) = {
+                    [this](emscripten::val) -> bool {
+                    this->_addToCartFn(this->_product);
+                    return true;
+                }}> Add To Cart</ button>
+                </ div>
+            </ div>;
+    // clang-format on
+}

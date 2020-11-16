@@ -1,0 +1,12 @@
+#include "Navbar.hpp"
+
+#include "utils.hpp"
+
+asmdom::VNode* Navbar::render() {
+    // clang-format off
+    return <div class = "navbar">
+             <div class = "navbar_title">{"CppMart"}</ div>
+             <div class = "navbar_cart_value">{to_fixed_precision_str(_cartValue)}</ div>
+            </ div>;
+    // clang-format on
+}

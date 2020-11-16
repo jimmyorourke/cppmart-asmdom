@@ -1,6 +1,7 @@
 #pragma once
 
 #include <asm-dom.hpp>
+#include "App.hpp"
 #include "Product.hpp"
 
 class Home {
@@ -20,3 +21,8 @@ class Home {
     std::vector<CartProduct> _cartProducts;
     double* _cartValue{};
 };
+
+inline Home& getHome() {
+    static Home h{&getApp().cartValue};
+    return h;
+}

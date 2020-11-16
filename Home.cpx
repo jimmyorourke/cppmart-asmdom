@@ -23,11 +23,11 @@ asmdom::VNode* Home::render() {
     for (const auto& product : _products) {
         // IMPORTANT! Pass by copy to callback to ensure lifetime!!!!
         productViews.push_back(ProductCard(product, [this](const Product& p) {
-                                   std::cout << "hi";
                                    return this->addToCart(p);
                                }).render());
     }
     auto cartprods = 0;
+    *_cartValue = 0;
     for (const auto& cartProduct : _cartProducts) {
         *_cartValue += cartProduct.quantity * cartProduct.product.price;
         std::cout << "cart prods: " << ++cartprods << "\n";

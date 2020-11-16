@@ -3,9 +3,11 @@
 #include <emscripten.h>
 #include "Navbar.hpp"
 #include "utils.hpp"
+#include "Home.hpp"
 
 asmdom::VNode* ProductDetail::render() {
-    EM_ASM(history.pushState(null, null, "productpage.php"));
+    // set the product name in the address bar
+    EM_ASM({history.pushState(null, null, UTF8ToString($0))}, _product.name.c_str());
 
     // clang-format off
     return <div>{Navbar(_cartValue).render()}
@@ -15,8 +17,9 @@ asmdom::VNode* ProductDetail::render() {
                 <div style = "margin: 10px 0; line-height: 24px;">{_product.description}</ div>
                 <div class = "product_card_price">{"$" + to_fixed_precision_str(_product.price)}</ div>
                 <button class = "product_atc_button"(onclick) = {
-                    [this](emscripten::val) -> bool {
-                    this->_addToCartFn(this->_product);
+                    [c=this->_addToCartFn, p=this->_product](emscripten::val) -> bool {
+                    c(p);
+                    getApp().pageRender(getHome().render());
                     return true;
                 }}> Add To Cart</ button>
                 </ div>

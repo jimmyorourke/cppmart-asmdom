@@ -1,72 +1,33 @@
 #include <asm-dom.hpp>
 #include <emscripten/val.h>
-#include <iomanip>
 #include <iostream>
-#include <sstream>
 
 #include <emscripten.h>
 #include <emscripten/bind.h>
+#include "App.hpp"
 #include "Home.hpp"
-#include "ProductDetail.hpp"
 
-class App {
- public:
-    void run() {
-        // inital view
-        homePage = std::make_unique<Home>(&cartValue, this);
-        pageRender(homePage->render());
-    }
-    void pageRender(asmdom::VNode* newVnode) {
-        static auto vdomReplaced = false;
-        if (!vdomReplaced) {
-            const auto root =
-                emscripten::val::global("document").call<emscripten::val>("getElementById", std::string("root"));
-            _currentVnode = asmdom::patch(root, newVnode);
-            vdomReplaced = true;
-        } else {
-            _currentVnode = asmdom::patch(_currentVnode, newVnode);
-        }
-    }
 
-    void renderHome() {
-        pageRender(homePage->render());
-    }
-    // application state -- shared state needed by multiple page views
-    double cartValue{};
-
-    // views - lazy init
-    std::unique_ptr<Home> homePage;
-    std::unique_ptr<ProductDetail> productPage;
-    
-private:
-    asmdom::VNode* _currentVnode = nullptr;
+void renderHome() { getApp().pageRender(getHome().render()); }
+EMSCRIPTEN_BINDINGS(app) {
+    emscripten::function("renderHome", &renderHome);
 };
-
-// void renderHome() { render(home.render()); }
-
-// void renderProduct() { render(productPage->render()); }
-
-// EMSCRIPTEN_BINDINGS(app) {
-//     emscripten::function("renderHome", &renderHome);
-//     emscripten::function("renderProduct", &renderProduct);
-// };
 
 int main() {
     // Initialize asm-dom.
     const auto config = asmdom::Config();
     asmdom::init(config);
 
-    static App app;
-    app.run();
+    auto& app = getApp();
+    app.pageRender(getHome().render());
 
+    // listener for the back button
     EM_ASM(window.addEventListener(
         'popstate', function(e) {
             var product = e.state;
 
             if (product == null) {
                 Module.renderHome();
-            } else {
-                Module['renderProduct']();
             }
         }));
 }

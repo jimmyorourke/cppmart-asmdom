@@ -1,0 +1,61 @@
+#include "Home.hpp"
+
+#include "Navbar.hpp"
+#include "ProductCard.hpp"
+#include <emscripten.h>
+#include <iostream>
+
+Home& getHome() {
+    static Home h{&getApp().cartValue};
+    return h;
+}
+
+Home::Home(double* cartValue)
+: _cartValue{cartValue} {
+    // TODO: load from file in background thread
+    // If this were actually loaded from a file we wouldn't want to do it every time we go back to the home page
+    // from a product view, hence why this component needs state even when not rendered
+    _products = {
+        {1, "Apple", "An apple a day keeps the doctor away", "./products/apple.png", 3.65},
+        {2, "Banana", "An old banana leaf was once young and green", "./products/banana.png", 7.99},
+    };
+}
+
+asmdom::VNode* Home::render() {
+    EM_ASM(history.replaceState(null, null, "./"));
+
+    asmdom::Children productViews;
+    for (const auto& product : _products) {
+        // IMPORTANT! Pass by copy to callback to ensure lifetime!!!!
+        productViews.push_back(ProductCard(product, [this](const Product& p) { return this->addToCart(p); }).render());
+    }
+    auto cartprods = 0;
+    *_cartValue = 0;
+    for (const auto& cartProduct : _cartProducts) {
+        *_cartValue += cartProduct.quantity * cartProduct.product.price;
+        std::cout << "cart prods: " << ++cartprods << "\n";
+    }
+    std::cout << "cartvalue " << *_cartValue << "\n";
+    // clang-format off
+    return asmdom::h(u8"div", asmdom::Children {Navbar(*_cartValue).render(), asmdom::h(u8"div", asmdom::Data (asmdom::Attrs {{u8"class", u8"product_card_list"}}), productViews)});
+    // clang-format on
+}
+
+bool Home::addToCart(const Product& product) {
+    // In this simple app the validation and cart product tracking is not actually necessary, but demonstrates a
+    // situation where a component does need to maintain state even if it no longers becomes part of the rendered
+    // component set
+    auto pit =
+        std::find_if(_products.begin(), _products.end(), [product](const auto& p) { return p.id == product.id; });
+    auto cpit = std::find_if(_cartProducts.begin(), _cartProducts.end(),
+                             [product](const auto& p) { return p.product.id == product.id; });
+    if (cpit != _cartProducts.end()) {
+        cpit->quantity += 1;
+    } else {
+        // structs emplace_back doesn't work?
+        _cartProducts.push_back({*pit, 1});
+    }
+    std::cout << "called add to cart with " << product.id << ", " << product.name << ", " << product.description << ","
+              << product.image << ", " << product.price << "\n";
+    return true;
+}

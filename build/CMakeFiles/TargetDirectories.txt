@@ -1,0 +1,12 @@
+/home/jim/asm-dom-test/build/CMakeFiles/rebuild_cache.dir
+/home/jim/asm-dom-test/build/CMakeFiles/edit_cache.dir
+/home/jim/asm-dom-test/build/CMakeFiles/gccx-store.dir
+/home/jim/asm-dom-test/build/CMakeFiles/cppmart.dir
+/home/jim/asm-dom-test/build/CMakeFiles/ProductDetail-target.dir
+/home/jim/asm-dom-test/build/CMakeFiles/ProductCard-target.dir
+/home/jim/asm-dom-test/build/CMakeFiles/main-target.dir
+/home/jim/asm-dom-test/build/CMakeFiles/Navbar-target.dir
+/home/jim/asm-dom-test/build/CMakeFiles/Home-target.dir
+/home/jim/asm-dom-test/build/cmake-asm-dom-wrapper/CMakeFiles/rebuild_cache.dir
+/home/jim/asm-dom-test/build/cmake-asm-dom-wrapper/CMakeFiles/asm-dom.dir
+/home/jim/asm-dom-test/build/cmake-asm-dom-wrapper/CMakeFiles/edit_cache.dir

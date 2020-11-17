@@ -25,6 +25,7 @@ private:
     // asmdom state
     asmdom::VNode* _currentVnode = nullptr;
 };
+
 inline App& getApp() {
     static App a;
     return a;

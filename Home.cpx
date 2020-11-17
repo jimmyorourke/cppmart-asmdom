@@ -1,9 +1,14 @@
 #include "Home.hpp"
 
-#include <emscripten.h>
-#include <iostream>
 #include "Navbar.hpp"
 #include "ProductCard.hpp"
+#include <emscripten.h>
+#include <iostream>
+
+Home& getHome() {
+    static Home h{&getApp().cartValue};
+    return h;
+}
 
 Home::Home(double* cartValue)
 : _cartValue{cartValue} {
@@ -22,9 +27,7 @@ asmdom::VNode* Home::render() {
     asmdom::Children productViews;
     for (const auto& product : _products) {
         // IMPORTANT! Pass by copy to callback to ensure lifetime!!!!
-        productViews.push_back(ProductCard(product, [this](const Product& p) {
-                                   return this->addToCart(p);
-                               }).render());
+        productViews.push_back(ProductCard(product, [this](const Product& p) { return this->addToCart(p); }).render());
     }
     auto cartprods = 0;
     *_cartValue = 0;

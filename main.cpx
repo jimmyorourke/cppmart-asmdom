@@ -1,209 +1,16 @@
 #include <asm-dom.hpp>
 #include <emscripten/val.h>
 #include <iostream>
-#include <iomanip>
-#include <sstream>
-#include <type_traits>
 
 #include <emscripten.h>
 #include <emscripten/bind.h>
-template <typename T>
-std::string to_fixed_precision_str(T num, int decimalPlaces=2) {
-    static_assert(std::is_arithmetic<T>::value, "Integral required.");
-    std::stringstream stream;
-    stream << std::fixed << std::setprecision(2) << num;
-    return stream.str();
-}
+#include "App.hpp"
+#include "Home.hpp"
 
 
-
-
-
-
-asmdom::VNode* currentVnode = nullptr;
-
-void render(asmdom::VNode* newVnode) {
-    static auto vdomReplaced = false;
-    if (!vdomReplaced) {
-        const auto root =
-            emscripten::val::global("document").call<emscripten::val>("getElementById", std::string("root"));
-        currentVnode = asmdom::patch(root, newVnode);
-        vdomReplaced = true;
-    }
-    else {
-        currentVnode = asmdom::patch(currentVnode, newVnode);
-    }
-}
-
-class Navbar {
-public:
-    void bindCartValue(double* valuePtr) {
-        _cartValue = valuePtr;
-    }
-
-    asmdom::VNode* render() {
-        return <div class="navbar">
-                <div class="navbar_title">{"CppMart"}</div>
-                <div class="navbar_cart_value">{to_fixed_precision_str(*_cartValue)}</div>
-               </div>;
-    }
-private:
-    double* _cartValue{};
-};
-
-struct Product {
-    int id;
-    std::string name;
-    std::string description;
-    std::string image;
-    double price;
-};
-
-Navbar navbar{};
-
-class ProductDetail {
-public:
-    ProductDetail(Product product, asmdom::Callback onAddToCart)
-    : _product{product}
-    , _onAddToCart{onAddToCart}
-    {}
-
-    asmdom::VNode* render() {
-        EM_ASM(history.pushState(null, null, "productpage.php"));
-        return <div>
-                {navbar.render()}
-                <div class="product_detail_container" >
-                    <img class="product_detail_image" src={_product.image}/>
-                    <div class="product_card_name">{_product.name}</div>
-                    <div style="margin: 10px 0; line-height: 24px;">{_product.description}</div>
-                    <div class="product_card_price">{"$" + to_fixed_precision_str(_product.price)}</div>
-                    <button class="product_atc_button" (onclick)={_onAddToCart}> Add To Cart</button>
-                </div>
-                </div>;
-    }
-private:
-    Product _product;
-    asmdom::Callback _onAddToCart;
-};
-
-std::unique_ptr<ProductDetail> productPage;
-
-
-// This gets created and immediately destroyed each render. Should just be function?
-class ProductCard {
-public:
-    struct Props {
-        Product product;
-        asmdom::Callback onAddToCart;
-    };
-    ProductCard(Props props) 
-    : _props{std::move(props)}
-    {}
-
-    asmdom::VNode* render() {
-        return <div class="product_card_container">
-                   <div (onclick)={[p=this->_props](emscripten::val)-> bool {
-                       std::cout <<"product deatail\n";
-                       productPage = std::make_unique<ProductDetail>(p.product, p.onAddToCart);
-                       ::render(productPage->render()); 
-                       return true;}}>
-                      <img class="product_card_image" src={_props.product.image} />
-                      <div class="product_card_name"> {_props.product.name} </div>
-                   </div>
-                   <div class="product_card_price"> {"$" + to_fixed_precision_str(_props.product.price)} </div>
-                   <button class="product_atc_button" (onclick)={_props.onAddToCart}> Add To Cart </button>
-               </div>;
-    }
-private:
-    Props _props{};
-};
-
-
-
-
-class Home {
-public:
-    Home() {
-        // TODO: load from file in background thread
-        _state = {std::vector<Product>{
-            {1, "Apple",  "An apple a day keeps the doctor away","/products/apple.png", 3.65 },
-            {2, "Banana",  "An old banana leaf was once young and green","/products/banana.png", 7.99 },
-            }, {}, true, false}; 
-        navbar.bindCartValue(&_cartValue);
-    }
-
-    asmdom::VNode* render() {
-        EM_ASM(history.replaceState(null, null, "./"));
-        if (!_state.productsLoaded) {
-            return <div>{"Loading ..."}</div>;
-        } else if (_state.productsError) {
-            return <div>{"Error loading products :("}</div>;
-        }
-        asmdom::Children productViews;
-        for (const auto& product : _state.products) {
-            // IMPORTANT! Pass by copy to callback!!!!
-            productViews.push_back(ProductCard({product, [this, product](emscripten::val)-> bool{return this->addToCart(product);}}).render());
-        }
-        _cartValue = 0.f;
-        auto cartprods = 0;
-        for (const auto& cartProduct : _state.cartProducts) {
-            _cartValue += cartProduct.quantity * cartProduct.product.price;
-            std::cout << "cart prods: " << ++cartprods << "\n";
-         }
-         std::cout << "cartvalue " << _cartValue << "\n";
-        // TODO: format to 2 decimal places -- fmtlib would work well with asm-dom/gccx
-        return <div>
-                   {navbar.render()}
-                    <div class="product_card_list">{...productViews}</div>
-               </div>;
-    }
-
-private:
-    bool addToCart(const Product& product) {
-        auto pit = std::find_if(_state.products.begin(), _state.products.end(), [product](const auto& p){return p.id == product.id;});
-        auto cpit = std::find_if(_state.cartProducts.begin(), _state.cartProducts.end(), [product](const auto& p){return p.product.id == product.id;});
-        if (cpit != _state.cartProducts.end()) {
-            cpit->quantity += 1;
-        }
-        else{
-            // structs emplace_back?
-            _state.cartProducts.push_back({*pit, 1});
-        }
-        std::cout << "called add to cart with " << product.id <<", " << product.name <<", " << product.description <<"," << product.image << ", " << product.price << "\n";
-        ::render(render());
-        return true;
-    }
-
-    struct CartProduct {
-        Product product;
-        int quantity;
-    };
-    struct State {
-        std::vector<Product> products;
-        std::vector<CartProduct> cartProducts;
-        bool productsLoaded{false};
-        bool productsError{false};
-    };
-    State _state{};
-    double _cartValue{};
-};
-
-asmdom::VNode *current_view = nullptr;
-
-
-Home home{};
-
-void renderHome() {
-    render(home.render());
-}
-
-void renderProduct() {
-    render(productPage->render());
-}
-
+void renderHome() { getApp().pageRender(getHome().render()); }
 EMSCRIPTEN_BINDINGS(app) {
-  emscripten::function("renderHome", &renderHome);
-  emscripten::function("renderProduct", &renderProduct);
+    emscripten::function("renderHome", &renderHome);
 };
 
 int main() {
@@ -211,24 +18,16 @@ int main() {
     const auto config = asmdom::Config();
     asmdom::init(config);
 
+    auto& app = getApp();
+    app.pageRender(getHome().render());
 
+    // listener for the back button
+    EM_ASM(window.addEventListener(
+        'popstate', function(e) {
+            var product = e.state;
 
-    render(home.render());
-
-    
-EM_ASM(
-window.addEventListener('popstate', function(e){
-    var product = e.state;
-
-    if (product == null) {
-      Module.renderHome();
-    } else {
-      Module['renderProduct']();
-    }
-  })
-);
-
+            if (product == null) {
+                Module.renderHome();
+            }
+        }));
 }
-
-
-

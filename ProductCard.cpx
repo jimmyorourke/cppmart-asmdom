@@ -1,0 +1,30 @@
+#include "ProductCard.hpp"
+
+#include <iostream>
+#include "utils.hpp"
+#include "App.hpp"
+#include "Home.hpp"
+#include "ProductDetail.hpp"
+
+asmdom::VNode* ProductCard::render() {
+    // clang-format off
+    return <div class = "product_card_container">
+             <div(onclick) = {[p = this->_product, c = this->_addToCartFn](emscripten::val) -> bool {
+                 std::cout << "product deatail\n";
+                 getApp().pageRender(ProductDetail{std::move(p), std::move(c), getApp().cartValue}.render());
+                 return true;
+               }}>
+               <img class = "product_card_image" src = {_product.image} />
+               <div class = "product_card_name">{_product.name}</ div>
+             </ div>
+             <div class = "product_card_price">{"$" + to_fixed_precision_str(_product.price)}</ div>
+             <button class = "product_atc_button"(onclick) = {
+             // n.b. Can't just capture "this" otherwise there will be lifetime issues with the callback
+             [c=this->_addToCartFn, p=this->_product](emscripten::val) -> bool {
+               c(p);
+               getApp().pageRender(getHome().render());
+               return true;
+             }}> Add To Cart</ button>
+           </ div>;
+    // clang-format on
+}

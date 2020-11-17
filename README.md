@@ -16,7 +16,7 @@ mkdir build && cd build
 emcmake cmake -G Ninja ..
 ninja
 ```
-Then server with `python3 -m http.server`
+Then serve with `python3 -m http.server`
 
 
 
